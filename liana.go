@@ -9,9 +9,9 @@ import (
 	// "net"
 	"os"
 	// "sort"
-	"strings"
-	// "time"
 	"github.com/xenolog/liana/radar"
+	"strings"
+	"time"
 )
 
 const (
@@ -39,6 +39,9 @@ func init() {
 		cli.BoolFlag{
 			Name:  "debug",
 			Usage: "Enable debug mode. Show more output",
+		}, cli.BoolTFlag{
+			Name:  "ipv4only",
+			Usage: "Use only IPv4 addresses",
 		},
 		cli.StringFlag{
 			Name:  "url, u",
@@ -91,6 +94,9 @@ func Responder() {
 ///// Server part /////
 
 func runServer(c *cli.Context) error {
+	var (
+		commonFlags []string
+	)
 	password := c.String("password")
 	if password == "" {
 		Log.Error("Crypto key not defined.")
@@ -98,12 +104,16 @@ func runServer(c *cli.Context) error {
 	}
 	Log.Info("Starting server")
 	interfaces := strings.Split(c.String("interfaces"), ",")
+	if c.GlobalBool("ipv4only") {
+		commonFlags = append(commonFlags, "ipv4only")
+	}
 	Log.Debug("Interfaces for autodiscovering: %s", interfaces)
 	for _, iface := range interfaces {
 		Log.Debug("+ starting radar for '%s'", iface)
-		r := radar.NewRadar(Log)
+		r := radar.NewRadar(Log, commonFlags)
 		go r.Run(iface, password)
 	}
+	time.Sleep(3 * time.Second)
 	return nil
 }
 
