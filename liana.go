@@ -11,6 +11,7 @@ import (
 	// "sort"
 	"strings"
 	// "time"
+	"github.com/xenolog/liana/radar"
 )
 
 const (
@@ -83,10 +84,6 @@ func main() {
 	App.Run(os.Args)
 }
 
-func Radar(iface string, passwd string) {
-	return
-}
-
 func Responder() {
 	return
 }
@@ -104,7 +101,8 @@ func runServer(c *cli.Context) error {
 	Log.Debug("Interfaces for autodiscovering: %s", interfaces)
 	for _, iface := range interfaces {
 		Log.Debug("+ starting radar for '%s'", iface)
-		go Radar(iface, password)
+		r := radar.NewRadar(Log)
+		go r.Run(iface, password)
 	}
 	return nil
 }
