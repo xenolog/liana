@@ -2,6 +2,7 @@ package radar
 
 import (
 	"fmt"
+	iii "github.com/xenolog/liana/identity"
 	"gopkg.in/xenolog/go-tiny-logger.v1"
 	"net"
 	"strings"
@@ -25,10 +26,10 @@ func (r *Radar) AddDestination(dst string) {
 	r.destination = append(r.destination, dst)
 }
 
-func (r *Radar) AddFlag(f string) {
+func (r *Radar) AddFlag(flag string) {
 	r.Lock()
-	r.flags = append(r.flags, dst)
-	r.Unlock()
+	defer r.Unlock()
+	r.flags = append(r.flags, flag)
 	// process some important flags
 	for _, v := range r.flags {
 		switch v {
@@ -72,6 +73,7 @@ func (r *Radar) Run(if_name string, passwd string) {
 		r.log.Info("%s address '%s' will be used while discovering", RR, string(r.ipv4))
 	}
 	r.log.Info("%s destination is '%s'", RR, r.destination)
+	identity := iii.New(r.log)
 }
 
 ///

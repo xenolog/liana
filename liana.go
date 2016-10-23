@@ -9,6 +9,7 @@ import (
 	// "net"
 	"os"
 	// "sort"
+	"github.com/xenolog/liana/identity"
 	"github.com/xenolog/liana/radar"
 	"strings"
 	"time"
@@ -101,7 +102,9 @@ func runServer(c *cli.Context) error {
 		Log.Error("Crypto key not defined.")
 		os.Exit(1)
 	}
-	Log.Info("Starting server")
+	iii := identity.New(Log)
+	iii.Run()
+	Log.Info("Starting server (hostname=%s)", iii.GetHostname())
 	interfaces := strings.Split(c.String("interfaces"), ",")
 	Log.Debug("Interfaces for autodiscovering: %s", interfaces)
 	for _, iface := range interfaces {
