@@ -5,14 +5,23 @@ import (
 	"gopkg.in/xenolog/go-tiny-logger.v1"
 	"net"
 	"strings"
+	"sync"
 )
 
 type Radar struct {
-	ipv4only bool
-	log      *logger.Logger
-	nic      *net.Interface
-	ipv4     net.IP
-	udpport  int
+	sync.RWMutex
+	ipv4only    bool
+	log         *logger.Logger
+	nic         *net.Interface
+	ipv4        net.IP
+	destination []string
+	udpport     int
+}
+
+func (r *Radar) AddDestination(dst string) {
+	r.Lock()
+	defer r.Unlock()
+	r.destination = append(r.destination, dst)
 }
 
 func (r *Radar) Run(if_name string, passwd string) {
@@ -48,6 +57,7 @@ func (r *Radar) Run(if_name string, passwd string) {
 	} else {
 		r.log.Info("%s address '%s' will be used while discovering", RR, string(r.ipv4))
 	}
+	r.log.Info("%s destination is '%s'", RR, r.destination)
 }
 
 ///

@@ -61,6 +61,10 @@ func init() {
 			cli.StringFlag{
 				Name:  "interfaces",
 				Usage: "Specify interfaces, where autodiscovering will be processed, use 'eth1,eth2' format",
+			}, cli.StringFlag{
+				Name:  "mcast-discovery",
+				Value: "224.0.0.127:3232",
+				Usage: "Specify mcast ipaddr, and port ",
 			},
 		},
 	}, {
@@ -111,6 +115,7 @@ func runServer(c *cli.Context) error {
 	for _, iface := range interfaces {
 		Log.Debug("+ starting radar for '%s'", iface)
 		r := radar.NewRadar(Log, commonFlags)
+		r.AddDestination(c.String("mcast-discovery"))
 		go r.Run(iface, password)
 	}
 	time.Sleep(3 * time.Second)
