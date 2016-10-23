@@ -11,6 +11,7 @@ import (
 type Radar struct {
 	sync.RWMutex
 	ipv4only    bool
+	flags       []string
 	log         *logger.Logger
 	nic         *net.Interface
 	ipv4        net.IP
@@ -22,6 +23,19 @@ func (r *Radar) AddDestination(dst string) {
 	r.Lock()
 	defer r.Unlock()
 	r.destination = append(r.destination, dst)
+}
+
+func (r *Radar) AddFlag(f string) {
+	r.Lock()
+	r.flags = append(r.flags, dst)
+	r.Unlock()
+	// process some important flags
+	for _, v := range r.flags {
+		switch v {
+		case "ipv4only":
+			r.ipv4only = true
+		}
+	}
 }
 
 func (r *Radar) Run(if_name string, passwd string) {
@@ -61,15 +75,8 @@ func (r *Radar) Run(if_name string, passwd string) {
 }
 
 ///
-func NewRadar(l *logger.Logger, flags []string) *Radar {
+func NewRadar(l *logger.Logger) *Radar {
 	r := new(Radar)
 	r.log = l
-	for _, v := range flags {
-		switch v {
-		case "ipv4only":
-			r.ipv4only = true
-		}
-	}
-
 	return r
 }

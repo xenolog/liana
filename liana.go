@@ -42,8 +42,7 @@ func init() {
 		}, cli.BoolTFlag{
 			Name:  "ipv4only",
 			Usage: "Use only IPv4 addresses",
-		},
-		cli.StringFlag{
+		}, cli.StringFlag{
 			Name:  "url, u",
 			Value: "udp://127.0.0.1:4001",
 			Usage: "Specify URL for connection or listen",
@@ -57,8 +56,7 @@ func init() {
 			cli.StringFlag{
 				Name:  "password",
 				Usage: "Specify password for crypt control traffic",
-			},
-			cli.StringFlag{
+			}, cli.StringFlag{
 				Name:  "interfaces",
 				Usage: "Specify interfaces, where autodiscovering will be processed, use 'eth1,eth2' format",
 			}, cli.StringFlag{
@@ -98,9 +96,6 @@ func Responder() {
 ///// Server part /////
 
 func runServer(c *cli.Context) error {
-	var (
-		commonFlags []string
-	)
 	password := c.String("password")
 	if password == "" {
 		Log.Error("Crypto key not defined.")
@@ -108,13 +103,13 @@ func runServer(c *cli.Context) error {
 	}
 	Log.Info("Starting server")
 	interfaces := strings.Split(c.String("interfaces"), ",")
-	if c.GlobalBool("ipv4only") {
-		commonFlags = append(commonFlags, "ipv4only")
-	}
 	Log.Debug("Interfaces for autodiscovering: %s", interfaces)
 	for _, iface := range interfaces {
 		Log.Debug("+ starting radar for '%s'", iface)
-		r := radar.NewRadar(Log, commonFlags)
+		r := radar.NewRadar(Log)
+		if c.GlobalBool("ipv4only") {
+			r.AddFlag("ipv4only")
+		}
 		r.AddDestination(c.String("mcast-discovery"))
 		go r.Run(iface, password)
 	}
