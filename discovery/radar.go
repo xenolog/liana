@@ -1,4 +1,4 @@
-package radar
+package discovery
 
 import (
 	"encoding/json"

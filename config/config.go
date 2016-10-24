@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	sync.Mutex
+	IPv4only         bool
 	Log              *logger.Logger
 	McastDestination string
 	McastInterval    time.Duration

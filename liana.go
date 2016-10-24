@@ -10,8 +10,8 @@ import (
 	"os"
 	// "sort"
 	"github.com/xenolog/liana/config"
+	"github.com/xenolog/liana/discovery"
 	"github.com/xenolog/liana/identity"
-	"github.com/xenolog/liana/radar"
 	"strconv"
 	"strings"
 	"time"
@@ -119,12 +119,13 @@ func runServer(c *cli.Context) error {
 	interfaces := strings.Split(c.String("interfaces"), ",")
 	Log.Debug("Interfaces for autodiscovering: %s", interfaces)
 	for _, iface := range interfaces {
-		Log.Debug("+ starting radar for '%s'", iface)
-		r := radar.NewRadar(cfg)
+		Log.Debug("+ starting discovery for '%s'", iface)
+		r := discovery.New(cfg)
 		if c.GlobalBool("ipv4only") {
-			r.AddFlag("ipv4only")
+			cfg.IPv4only = true
 		}
-		go r.Run(iface, password)
+		// go r.Run(iface, password)
+		go r.Run()
 	}
 	time.Sleep(3 * time.Second)
 	return nil
