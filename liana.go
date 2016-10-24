@@ -9,8 +9,10 @@ import (
 	// "net"
 	"os"
 	// "sort"
+	"github.com/xenolog/liana/config"
 	"github.com/xenolog/liana/identity"
 	"github.com/xenolog/liana/radar"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -64,6 +66,10 @@ func init() {
 				Name:  "mcast-discovery",
 				Value: "224.0.0.127:3232",
 				Usage: "Specify mcast ipaddr, and port ",
+			}, cli.UintFlag{
+				Name:  "discovery-interval",
+				Value: 20,
+				Usage: "Specify mcast ipaddr, and port ",
 			},
 		},
 	}, {
@@ -102,18 +108,22 @@ func runServer(c *cli.Context) error {
 		Log.Error("Crypto key not defined.")
 		os.Exit(1)
 	}
-	iii := identity.New(Log)
-	iii.Run()
-	Log.Info("Starting server (hostname=%s)", iii.GetHostname())
+	cfg := config.New()
+	cfg.Log = Log
+	cfg.McastInterval = time.Duration(c.Uint("discovery-interval"))
+	cfg.Identity = identity.New(Log)
+	cfg.McastDestination = c.String("mcast-discovery")
+	cfg.ListenPort, _ = strconv.Atoi(strings.Split(c.String("mcast-discovery"), ":")[1])
+	cfg.Identity.Run()
+	Log.Info("Starting server (hostname=%s)", cfg.Identity.GetHostname())
 	interfaces := strings.Split(c.String("interfaces"), ",")
 	Log.Debug("Interfaces for autodiscovering: %s", interfaces)
 	for _, iface := range interfaces {
 		Log.Debug("+ starting radar for '%s'", iface)
-		r := radar.NewRadar(Log)
+		r := radar.NewRadar(cfg)
 		if c.GlobalBool("ipv4only") {
 			r.AddFlag("ipv4only")
 		}
-		r.AddDestination(c.String("mcast-discovery"))
 		go r.Run(iface, password)
 	}
 	time.Sleep(3 * time.Second)
