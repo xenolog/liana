@@ -103,6 +103,7 @@ func Responder() {
 ///// Server part /////
 
 func runServer(c *cli.Context) error {
+	Log.Debug("Starting server...")
 	password := c.String("password")
 	if password == "" {
 		Log.Error("Crypto key not defined.")
@@ -118,16 +119,9 @@ func runServer(c *cli.Context) error {
 	Log.Info("Starting server (hostname=%s)", cfg.Identity.GetHostname())
 	interfaces := strings.Split(c.String("interfaces"), ",")
 	Log.Debug("Interfaces for autodiscovering: %s", interfaces)
-	for _, iface := range interfaces {
-		Log.Debug("+ starting discovery for '%s'", iface)
-		r := discovery.New(cfg)
-		if c.GlobalBool("ipv4only") {
-			cfg.IPv4only = true
-		}
-		// go r.Run(iface, password)
-		go r.Run()
-	}
-	time.Sleep(3 * time.Second)
+	discovery.NewDiscovery(cfg, &interfaces).Run()
+	time.Sleep(5 * cfg.McastInterval * time.Second)
+	Log.Debug("Server stopped.")
 	return nil
 }
 

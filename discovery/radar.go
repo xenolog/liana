@@ -12,33 +12,24 @@ import (
 
 const version = "0.0.1"
 
+type RadarFanout chan string
+
 type Radar struct {
-	sync.RWMutex
-	ipv4only bool
-	flags    []string
-	cfg      *config.Config
-	nic      *net.Interface
-	ipv4     string
-	udpport  int
+	sync.Mutex
+	ipv4only      bool
+	cfg           *config.Config
+	nic           *net.Interface
+	ipv4          string
+	udpport       int
+	stopRadar     chan struct{} // any message from this chan is a command to destroy an Radar
+	stopResponder chan struct{} // any message from this chan is a command to destroy an Responder
+	fanout        RadarFanout
 }
 
 type Beacon struct {
 	Version   string `json:"version"`
 	Name      string `json:"name"`
 	Endpoints string `json:"endpoint"`
-}
-
-func (r *Radar) AddFlag(flag string) {
-	r.Lock()
-	defer r.Unlock()
-	r.flags = append(r.flags, flag)
-	// process some important flags
-	for _, v := range r.flags {
-		switch v {
-		case "ipv4only":
-			r.ipv4only = true
-		}
-	}
 }
 
 func (r *Radar) Sleep() {
@@ -50,22 +41,38 @@ func (r *Radar) CryptBeacon(txt []byte) []byte {
 	return txt
 }
 
-func (r *Radar) Run(if_name string, passwd string) {
+// first byte is a action:
+// '+','-' -- add/remove Responder for the interface
+// '!'     -- destroy Radar and Responder
+func (r *Radar) fanoutMsg(op string) {
+	switch op {
+	case "+", "-":
+		r.fanout <- fmt.Sprintf("%s%s:%s:%d", op, r.nic.Name, r.ipv4, r.cfg.ListenPort)
+	case "!":
+		r.fanout <- fmt.Sprintf("%s%s", op, r.nic.Name)
+	}
+}
+
+func (r *Radar) Run() {
 	var (
 		err                      error
 		addrs                    []net.Addr
 		src_ip_port, dst_ip_port *net.UDPAddr
 		out_mcast_conn           *net.UDPConn
 	)
-	RR := fmt.Sprintf("Radar(%s):", if_name)
-	if r.nic, err = net.InterfaceByName(if_name); err != nil {
-		r.cfg.Log.Warn("%s network interface not found.", RR)
-		return
-	}
+	RR := fmt.Sprintf("Radar(%s):", r.nic.Name)
 	for {
+		// This is a monitoring for NIC alive or dead
+		if _, err = net.InterfaceByName(r.nic.Name); err != nil {
+			r.cfg.Log.Debug("%s NIC was destroyed, Radar will be distroyed", RR)
+			r.fanoutMsg("-")
+			r.fanoutMsg("!")
+			break
+		}
 		// Calculate source address for beacon
 		if addrs, err = r.nic.Addrs(); err != nil || 1 > len(addrs) {
 			r.cfg.Log.Warn("%s No ip addresses given.", RR)
+			r.fanoutMsg("-")
 			r.Sleep()
 			continue
 		}
@@ -75,7 +82,7 @@ func (r *Radar) Run(if_name string, passwd string) {
 			r.cfg.Log.Debug("%s %02d: interface has address '%s'", RR, i, addr)
 			// if r.ipv4only && strings.Contains(addr, ":") { // is it a prohibited ipv6 address
 			if strings.Contains(addr, ":") {
-				continue
+				continue // it's a IPv6 address, see next address
 			} else {
 				r.ipv4 = strings.Split(addr, "/")[0]
 				break
@@ -83,6 +90,7 @@ func (r *Radar) Run(if_name string, passwd string) {
 		}
 		if r.ipv4 == "" {
 			r.cfg.Log.Warn("%s No IPv4 addresses given.", RR)
+			r.fanoutMsg("-")
 			r.Sleep()
 			continue
 		} else {
@@ -95,6 +103,9 @@ func (r *Radar) Run(if_name string, passwd string) {
 			r.cfg.Log.Error("Can't create outbound socket for beacon: %s", err)
 			r.Sleep()
 			continue
+		}
+		if r.stopResponder == nil {
+			r.fanoutMsg("+")
 		}
 		beacon, _ := json.Marshal(Beacon{
 			Version:   version,
@@ -109,13 +120,31 @@ func (r *Radar) Run(if_name string, passwd string) {
 		}
 		out_mcast_conn.Close()
 		// sleep before next beacon
-		r.Sleep()
+		select {
+		case <-time.After(r.cfg.McastInterval * time.Second):
+			// just timeout
+		case <-r.stopRadar:
+			close(r.stopRadar)
+			r.fanoutMsg("!")
+			break
+		}
 	}
 }
 
 ///
-func NewRadar(cfg *config.Config) *Radar {
-	r := new(Radar)
-	r.cfg = cfg
-	return r
+func NewRadar(cfg *config.Config, if_name string, ch RadarFanout) *Radar {
+	var (
+		err error
+		nic *net.Interface
+	)
+	if nic, err = net.InterfaceByName(if_name); err != nil {
+		//cfg.Log.Debug("Interface search by name throw error: %s", err)
+		return nil
+	}
+	new_radar := new(Radar)
+	new_radar.cfg = cfg
+	new_radar.fanout = ch
+	new_radar.nic = nic
+	cfg.Log.Debug("Radar for '%s' created", if_name)
+	return new_radar
 }
