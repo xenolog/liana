@@ -64,10 +64,10 @@ func (d *Discovery) RemoveResponder(if_name string) {
 	d.Unlock()
 }
 
-func (d *Discovery) AddResponder(if_name string) {
+func (d *Discovery) AddResponder(if_name, conn_info string) {
 	if !d.responderExists(if_name, false) {
 		d.cfg.Log.Debug("Try to create Responder for '%s'", if_name)
-		if new_responder := NewResponder(d.cfg, if_name, d.respondersFanout); new_responder != nil {
+		if new_responder := NewResponder(d.cfg, if_name, conn_info, d.respondersFanout); new_responder != nil {
 			d.responders[if_name] = new_responder
 			go d.responders[if_name].Run()
 		}
@@ -99,7 +99,7 @@ func (d *Discovery) responderRunner() {
 				d.cfg.Log.Debug("Message from Radar: '%s'", msg)
 				// Responder for Radar should be run
 				resp_info := strings.SplitN(msg[1:], ":", 2)
-				d.AddResponder(resp_info[0])
+				d.AddResponder(resp_info[0], resp_info[1])
 			case msg[0] == '-':
 				d.cfg.Log.Debug("Message from Radar: '%s'", msg)
 				// Responder for Radar should be died

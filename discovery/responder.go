@@ -16,6 +16,7 @@ type Responder struct {
 	sync.Mutex
 	cfg           *config.Config
 	nic_name      string
+	self          *net.UDPAddr
 	stopResponder chan struct{} // any message from this chan is a command to destroy an Radar
 	fanout        ResponderFanout
 }
@@ -46,10 +47,12 @@ func (r *Responder) Run() {
 		listen_ip_port *net.UDPAddr
 		in_mcast_conn  *net.UDPConn
 		beacon, buff   []byte
+		read_buffer    []byte
 		ConnInfo       Beacon
 		from_network   chan []byte
 	)
 	RR := fmt.Sprintf("Responder(%s):", r.nic_name)
+	r.cfg.Log.Debug("%s starting...", RR)
 	if nic, err = net.InterfaceByName(r.nic_name); err != nil {
 		r.cfg.Log.Error("%s Interface search by name throw error: %s", RR, err)
 		return
@@ -59,20 +62,36 @@ func (r *Responder) Run() {
 		r.cfg.Log.Error("%s Can't start mcast listening on interface '%s', for '%s': %s", RR, r.nic_name, listen_ip_port, err)
 		return
 	}
+	in_mcast_conn.SetReadBuffer(1048576)
 	from_network = make(chan []byte, READ_CHAN_BUFF)
+	read_buffer = make([]byte, 1500) // about MTU of interface
 	for {
 		// detach read from network
-		go func() {
+		go func(c *net.UDPConn, data []byte, self *net.UDPAddr, ch chan []byte) {
 			var (
-				data []byte
-				err  error
+				income *net.UDPAddr
+				err    error
 			)
-			if _, err = in_mcast_conn.Read(data); err != nil {
-				r.cfg.Log.Error("%s error while mcast packer read: %s", RR, err)
-				data = nil
+			for {
+				//TODO: Handle timeout for ReadFromUDP
+				// ReadFromUDP can be made to time out and return
+				// an error with Timeout() == true after a fixed time limit;
+				// see SetDeadline and SetReadDeadline.
+				if _, income, err = c.ReadFromUDP(data); err != nil {
+					r.cfg.Log.Error("%s error while mcast packer read: %s", RR, err)
+					data = nil
+				}
+				if fmt.Sprintf("%s", self.IP) == fmt.Sprintf("%s", income.IP) {
+					// filter self-made packages
+					continue
+				} else {
+					// r.cfg.Log.Debug("%s XX self='%s' income='%s'", RR, fmt.Sprintf("%s", self.IP), fmt.Sprintf("%s", income.IP))
+					// r.cfg.Log.Debug("%s XX read from network: '%s'", RR, data)
+					ch <- data
+					break
+				}
 			}
-			from_network <- data
-		}()
+		}(in_mcast_conn, read_buffer, r.self, from_network)
 
 		select {
 		case <-r.stopResponder:
@@ -103,12 +122,13 @@ func (r *Responder) Run() {
 }
 
 ///
-func NewResponder(cfg *config.Config, if_name string, ch ResponderFanout) *Responder {
+func NewResponder(cfg *config.Config, if_name string, self_source string, ch ResponderFanout) *Responder {
 	new_responder := new(Responder)
 	new_responder.cfg = cfg
 	new_responder.fanout = ch
 	new_responder.stopResponder = make(chan struct{}, 1)
 	new_responder.nic_name = if_name
+	new_responder.self, _ = net.ResolveUDPAddr("udp", self_source)
 	cfg.Log.Debug("Responder for '%s' created", if_name)
 	return new_responder
 }

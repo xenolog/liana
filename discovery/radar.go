@@ -119,10 +119,12 @@ func (r *Radar) Run() {
 			continue
 		}
 		out_mcast_conn.Close()
+		r.fanoutMsg("+")
 		// sleep before next beacon
 		select {
 		case <-time.After(r.cfg.McastInterval * time.Second):
 			// just timeout
+			r.cfg.Log.Debug("%s waiting between announces done.", RR)
 		case <-r.stopRadar:
 			close(r.stopRadar)
 			r.fanoutMsg("!")
