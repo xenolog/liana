@@ -39,7 +39,7 @@ func (d *Discovery) RemoveRadar(if_name string) {
 }
 
 func (d *Discovery) AddRadar(if_name string) {
-	if !d.RadarsExists(if_name) {
+	if !d.RadarExists(if_name) {
 		d.cfg.Log.Debug("Try to create Radar for '%s'", if_name)
 		if new_radar := NewRadar(d.cfg, if_name, d.radarsFanout); new_radar != nil {
 			d.Lock()
