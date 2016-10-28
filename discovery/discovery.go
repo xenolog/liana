@@ -22,22 +22,31 @@ type Discovery struct {
 
 var host_discovery *Discovery
 
+func (d *Discovery) RadarExists(if_name string) bool {
+	d.Lock()
+	defer d.Unlock()
+	_, ok := d.radars[if_name]
+	return ok
+}
+
 func (d *Discovery) RemoveRadar(if_name string) {
-	if _, ok := d.radars[if_name]; !ok {
-		return
+	if d.RadarExists(if_name) {
+		d.cfg.Log.Debug("Destroy Radar for '%s'", if_name)
+		d.Lock()
+		defer d.Unlock()
+		delete(d.radars, if_name)
 	}
-	d.cfg.Log.Debug("Destroy Radar for '%s'", if_name)
-	delete(d.radars, if_name)
 }
 
 func (d *Discovery) AddRadar(if_name string) {
-	if _, ok := d.radars[if_name]; ok {
-		return
-	}
-	d.cfg.Log.Debug("Try to create Radar for '%s'", if_name)
-	if new_radar := NewRadar(d.cfg, if_name, d.radarsFanout); new_radar != nil {
-		d.radars[if_name] = new_radar
-		go d.radars[if_name].Run()
+	if !d.RadarsExists(if_name) {
+		d.cfg.Log.Debug("Try to create Radar for '%s'", if_name)
+		if new_radar := NewRadar(d.cfg, if_name, d.radarsFanout); new_radar != nil {
+			d.Lock()
+			defer d.Unlock()
+			d.radars[if_name] = new_radar
+			go d.radars[if_name].Run()
+		}
 	}
 }
 
@@ -51,9 +60,7 @@ func (d *Discovery) radarRunner() {
 			if if_name[len(if_name)-1] == '*' {
 				//todo: handle an interface wildcard
 			} else {
-				if _, ok := d.radars[if_name]; !ok {
-					d.AddRadar(if_name)
-				}
+				d.AddRadar(if_name)
 			}
 		}
 		// handle signals from Liana core
