@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/xenolog/liana/config"
 	"net"
+	"strings"
 	"sync"
+	"time"
 )
 
 const READ_CHAN_BUFF = 32
@@ -74,13 +76,15 @@ func (r *Responder) Run() {
 				received int
 			)
 			for {
-				//TODO: Handle timeout for ReadFromUDP
-				// ReadFromUDP can be made to time out and return
-				// an error with Timeout() == true after a fixed time limit;
-				// see SetDeadline and SetReadDeadline.
+				// it'a time in the future, not an interval
+				c.SetReadDeadline(time.Now().Add(17 * time.Second))
 				if received, income, err = c.ReadFromUDP(data); err != nil {
-					r.cfg.Log.Error("%s error while mcast packer read: %s", RR, err)
-					data = nil
+					if !strings.HasSuffix(err.Error(), "i/o timeout") {
+						// timeout is not error
+						r.cfg.Log.Error("%s error while mcast packet read: '%s'", RR, err)
+					}
+					ch <- nil
+					break
 				}
 				if fmt.Sprintf("%s", self.IP) == fmt.Sprintf("%s", income.IP) {
 					// filter self-made packages
