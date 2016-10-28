@@ -16,15 +16,15 @@ type RadarFanout chan string
 
 type Radar struct {
 	sync.Mutex
-	ipv4only      bool
-	cfg           *config.Config
-	nic           *net.Interface
-	ipv4          string
-	udpport       int
-	stopRadar     chan struct{} // any message from this chan is a command to destroy an Radar
-	stopResponder chan struct{} // any message from this chan is a command to destroy an Responder
-	fanout        RadarFanout
+	ipv4only  bool
+	cfg       *config.Config
+	nic       *net.Interface
+	ipv4      string
+	udpport   int
+	stopRadar chan struct{} // any message from this chan is a command to destroy an Radar
+	fanout    RadarFanout
 }
+type RadarMap map[string]*Radar
 
 type Beacon struct {
 	Version   string `json:"version"`
@@ -45,12 +45,15 @@ func (r *Radar) CryptBeacon(txt []byte) []byte {
 // '+','-' -- add/remove Responder for the interface
 // '!'     -- destroy Radar and Responder
 func (r *Radar) fanoutMsg(op string) {
+	var msg string
 	switch op {
 	case "+", "-":
-		r.fanout <- fmt.Sprintf("%s%s:%s:%d", op, r.nic.Name, r.ipv4, r.cfg.ListenPort)
+		msg = fmt.Sprintf("%s%s:%s:%d", op, r.nic.Name, r.ipv4, r.cfg.ListenPort)
 	case "!":
-		r.fanout <- fmt.Sprintf("%s%s", op, r.nic.Name)
+		msg = fmt.Sprintf("%s%s", op, r.nic.Name)
 	}
+	r.cfg.Log.Debug("Radar(%s): fanout message: '%s'", r.nic.Name, msg)
+	r.fanout <- msg
 }
 
 func (r *Radar) Run() {
@@ -100,12 +103,9 @@ func (r *Radar) Run() {
 		src_ip_port, _ = net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", r.ipv4, r.cfg.ListenPort))
 		dst_ip_port, _ = net.ResolveUDPAddr("udp", r.cfg.McastDestination)
 		if out_mcast_conn, err = net.DialUDP("udp", src_ip_port, dst_ip_port); err != nil {
-			r.cfg.Log.Error("Can't create outbound socket for beacon: %s", err)
+			r.cfg.Log.Error("%s Can't create outbound socket for beacon: %s", RR, err)
 			r.Sleep()
 			continue
-		}
-		if r.stopResponder == nil {
-			r.fanoutMsg("+")
 		}
 		beacon, _ := json.Marshal(Beacon{
 			Version:   version,
@@ -114,7 +114,7 @@ func (r *Radar) Run() {
 		})
 		r.cfg.Log.Debug("%s beacon '%s'", RR, beacon)
 		if _, err = out_mcast_conn.Write(r.CryptBeacon(beacon)); err != nil {
-			r.cfg.Log.Error("Can't send beacon: %s", err)
+			r.cfg.Log.Error("%s Can't send beacon: %s", RR, err)
 			r.Sleep()
 			continue
 		}
@@ -144,6 +144,7 @@ func NewRadar(cfg *config.Config, if_name string, ch RadarFanout) *Radar {
 	new_radar := new(Radar)
 	new_radar.cfg = cfg
 	new_radar.fanout = ch
+	new_radar.stopRadar = make(chan struct{}, 1)
 	new_radar.nic = nic
 	cfg.Log.Debug("Radar for '%s' created", if_name)
 	return new_radar
