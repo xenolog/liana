@@ -69,15 +69,16 @@ func (r *Responder) Run() {
 		// detach read from network
 		go func(c *net.UDPConn, data []byte, self *net.UDPAddr, ch chan []byte) {
 			var (
-				income *net.UDPAddr
-				err    error
+				income   *net.UDPAddr
+				err      error
+				received int
 			)
 			for {
 				//TODO: Handle timeout for ReadFromUDP
 				// ReadFromUDP can be made to time out and return
 				// an error with Timeout() == true after a fixed time limit;
 				// see SetDeadline and SetReadDeadline.
-				if _, income, err = c.ReadFromUDP(data); err != nil {
+				if received, income, err = c.ReadFromUDP(data); err != nil {
 					r.cfg.Log.Error("%s error while mcast packer read: %s", RR, err)
 					data = nil
 				}
@@ -87,7 +88,7 @@ func (r *Responder) Run() {
 				} else {
 					// r.cfg.Log.Debug("%s XX self='%s' income='%s'", RR, fmt.Sprintf("%s", self.IP), fmt.Sprintf("%s", income.IP))
 					// r.cfg.Log.Debug("%s XX read from network: '%s'", RR, data)
-					ch <- data
+					ch <- data[:received]
 					break
 				}
 			}
