@@ -1,0 +1,8 @@
+language: go
+go:
+  - 1.7.3
+  #- master
+install:
+  - go get gopkg.in/urfave/cli.v1
+  - go get gopkg.in/xenolog/go-tiny-logger.v1
+script: go test ./...
