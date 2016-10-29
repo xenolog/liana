@@ -11,3 +11,12 @@ test:
 lint:
 	golint ./...
 
+docker-run:
+	docker run --rm -it -v "${GOPATH}/src":/go/src/ -w /go/src/github.com/xenolog/liana  golang:alpine  go run liana.go --debug server --password="${LIANA_PASSWORD}" --interfaces=eth0
+
+docker-build:
+	docker run --rm -it -v "${GOPATH}/src":/go/src/ -w /go/src/github.com/xenolog/liana  golang:alpine  go build
+
+docker-shell:
+	docker run --rm -it -v "${GOPATH}/src":/go/src/ -w /go/src/github.com/xenolog/liana  xenolog/bird  /bin/bash
+
