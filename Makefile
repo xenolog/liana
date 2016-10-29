@@ -20,3 +20,5 @@ docker-build:
 docker-shell:
 	docker run --rm -it -v "${GOPATH}/src":/go/src/ -w /go/src/github.com/xenolog/liana  xenolog/bird  /bin/bash
 
+docker-killall:
+	docker ps | grep 'go run liana.go' | grep -v grep | awk '{print $$1}' | xargs -I% -n1 docker exec % killall -9 liana
