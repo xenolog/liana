@@ -64,6 +64,7 @@ func (r *Radar) Run() {
 		out_mcast_conn           *net.UDPConn
 	)
 	RR := fmt.Sprintf("Radar(%s):", r.nic.Name)
+loop:
 	for {
 		// This is a monitoring for NIC alive or dead
 		if _, err = net.InterfaceByName(r.nic.Name); err != nil {
@@ -128,7 +129,7 @@ func (r *Radar) Run() {
 		case <-r.stopRadar:
 			close(r.stopRadar)
 			r.fanoutMsg("!")
-			break
+			break loop
 		}
 	}
 }

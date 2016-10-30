@@ -160,6 +160,7 @@ func (d *Discovery) radarRunner() {
 	if d.RadarsAlive {
 		return
 	}
+loop:
 	for {
 		for _, if_name := range d.interfaces {
 			if if_name[len(if_name)-1] == '*' {
@@ -179,7 +180,7 @@ func (d *Discovery) radarRunner() {
 			for _, r := range d.radars {
 				r.stopRadar <- struct{}{}
 			}
-			break
+			break loop
 		}
 	}
 }

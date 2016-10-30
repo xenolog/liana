@@ -67,6 +67,7 @@ func (r *Responder) Run() {
 	in_mcast_conn.SetReadBuffer(1048576)
 	from_network = make(chan []byte, READ_CHAN_BUFF)
 	read_buffer = make([]byte, 1500) // about MTU of interface
+loop:
 	for {
 		// detach read from network
 		go func(c *net.UDPConn, data []byte, self *net.UDPAddr, ch chan []byte) {
@@ -103,7 +104,7 @@ func (r *Responder) Run() {
 			// signal from control plane is time to die
 			close(r.stopResponder)
 			r.fanoutMsg("!")
-			break
+			break loop
 		case buff = <-from_network:
 			// do nothing here, data from network will be processed below
 		}
